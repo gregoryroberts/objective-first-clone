@@ -50,23 +50,46 @@ c = spec.out.Hz;
 % the overlap of the output mode from the structure with the desired output
 % waveguide mode specified.  As a minimization problem, this is equivalent
 % ot minimizing the negative of that same overlap integral.
-compute_objective = @(input_Hz) (-(c'*input_Hz)*conj(c'*input_Hz));
+% compute_objective = @(input_Hz) (-(c'*input_Hz)*conj(c'*input_Hz));
+
+% Let's minimize the 2-norm difference between the specification and the
+% input
+compute_objective = @(input_Hz) power((c - input_Hz)'*(c - input_Hz), 0.5);
+g_x_partial = @(input_Hz, S_filter) ...
+    (-0.5 * power((c - S_filter * input_Hz)' * (c - S_filter * input_Hz), -0.5) * (c - S_filter * input_Hz)' * S_filter);
+
+
+% compute_objective = @(input_Hz) (-(c'*input_Hz)*conj(c'*input_Hz)) / ((input_Hz'*input_Hz) * (c' * c));
+
+% g_x_partial = @(input_Hz, S_filter) g_x_partial_normalized_overlap(c, input_Hz, S_filter);
+
+
+
 % Partial derivative of the objective function, g, with respect to the
 % field variable input_Hz
-g_x_partial = @(input_Hz, S_filter) -c'*S_filter*conj(c'*(S_filter*input_Hz));
+% g_x_partial = @(input_Hz, S_filter) -c'*S_filter*conj(c'*(S_filter*input_Hz));
 
 % Setup gradient descent parameters.  Run for a fixed number of iterations
 % with a fixed step size.
+% This step size is likely far too big
+% for the convergence test will want to do a running average to make sure convergence is stable
+% or check something like not letting the objective value change too much
+% between iterations as a way to check for convergence
 step_size = 20;
-num_iter = 40;
+num_iter = 120;
+
+objective_over_time = zeros(num_iter, 1);
 
 for n = 1 : 1 : num_iter
     tic;
     [Ex_adj, Ey_adj, Hz_adj, gradient_adj] = ob1_fdfd_adj(spec.omega, eps, spec.in, g_x_partial, spec.bc);
     adjoint_time = toc;
 
-    fprintf('Iteration #%d, Objective Function Value = %f, Computation Time (sec) = %f!\n', ...
-        n, compute_objective(Hz_adj(end,:).'), adjoint_time);
+    current_objective = compute_objective(Hz_adj(end,:).');
+    fprintf('Iteration #%d, Objective Function Value = %f, Computation Time (sec) = %f (%f)!\n', ...
+        n, current_objective, adjoint_time, mean(mean(eps)));
+    
+    objective_over_time(n) = current_objective;
        
     eps(3:end-2,3:end-2) = eps(3:end-2,3:end-2) - step_size * (gradient_adj(3:end-2,3:end-2));
     eps(3:end-2,3:end-2) = min(eps(3:end-2,3:end-2), max_eps_array(3:end-2,3:end-2));
@@ -76,6 +99,9 @@ end
 % Simulate the result and analyze the success of the design process.
 simulate(spec, eps, [simulation_width simulation_height]);
 
-save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
-csvwrite(save_epsilon_filename, eps);
+% figure;
+% plot(1:num_iter, objective_over_time);
+
+% save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
+% csvwrite(save_epsilon_filename, eps);
 
