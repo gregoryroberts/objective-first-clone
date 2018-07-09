@@ -64,7 +64,7 @@ if strcmp(bc, 'pml')
     Hcurl = [scy(.5,0)*(S(0,0)-S(0,-1));  scx(0,.5)*-(S(0,0)-S(-1,0))]; 
 elseif strcmp(bc, 'per')
     Ecurl = [-(S(0,1)-S(0,0)), scx(.5,.5)*(S(1,0)-S(0,0))];  
-    Hcurl = [(S(0,0)-S(0,-1));  scx(0,.5)*-(S(0,0)-S(-1,0))]; 
+    Hcurl = [(S(0,0)-S(0,-1));  scx(0,.5)*-(S(0,0)-S(-1,0))];
 end
 
 % Diagonal matrix for 1/epsilon.
@@ -90,6 +90,8 @@ elseif strcmp(bc, 'per')
 end
 b(in_pos+1, b_pad(1)+1:end-b_pad(2)) = in.Hz;
 b(in_pos, b_pad(1)+1:end-b_pad(2)) = -in.Hz * exp(1i * in.beta);
+
+original_b = b(:);
 
 % Convert from field to current source.
 b = b ./ eps_y;
@@ -137,10 +139,15 @@ for e_col = 1 : 1 : width
         get_eps_i = vect_eps(n);
         inv_eps2 = 0.5 / (get_eps_i^2);
 
+        % Take care of A dependence on epsilon
         sparse_eps = zeros(2 * pdims, 1);
+        % Take care of b dependence on epsilon
+        sparse_column = zeros(pdims, 1);
 
         sparse_eps(n) = inv_eps2 * Hcurl_Hz(n);
         sparse_eps(n + pdims) = inv_eps2 * Hcurl_Hz(n + pdims);
+        
+        sparse_column(n) = -original_b(n) * inv_eps2;
 
         % These two sets of if/else blocks take care of wrapping behavior
         % of epsilon interpolation in x and y.  For further optimization,
@@ -154,11 +161,14 @@ for e_col = 1 : 1 : width
 
         if (n <= dims(1))
             sparse_eps(n + pdims + (dims(2) - 1)*dims(1)) = inv_eps2 * Hcurl_Hz(n + pdims + (dims(2) - 1)*dims(1));
+            sparse_column(n + (dims(2) - 1)*dims(1)) = -original_b(n + (dims(2) - 1)*dims(1)) * inv_eps2;
         else
             sparse_eps(n + pdims - dims(1)) = inv_eps2 * Hcurl_Hz(n + pdims - dims(1));
+            sparse_column(n - dims(1)) = -original_b(n - dims(1)) * inv_eps2;
         end
 
-        complex_gradient(n,1) = lambda_adjoint * (Ecurl * sparse_eps);
+        complex_gradient(n,1) = lambda_adjoint * (sparse_column + Ecurl * sparse_eps);
+%         complex_gradient(n,1) = lambda_adjoint * (Ecurl * sparse_eps);
 
     end
 end
