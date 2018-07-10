@@ -168,8 +168,6 @@ for e_col = 1 : 1 : width
         end
 
         complex_gradient(n,1) = lambda_adjoint * (sparse_column + Ecurl * sparse_eps);
-%         complex_gradient(n,1) = lambda_adjoint * (Ecurl * sparse_eps);
-
     end
 end
 
