@@ -52,19 +52,6 @@ c = spec.out.Hz;
 % ot minimizing the negative of that same overlap integral.
 compute_objective = @(input_Hz) (-(c'*input_Hz)*conj(c'*input_Hz));
 
-% Let's minimize the 2-norm difference between the specification and the
-% input
-% compute_objective = @(input_Hz) power((c - input_Hz)'*(c - input_Hz), 0.5);
-% g_x_partial = @(input_Hz, S_filter) ...
-%     (-0.5 * power((c - S_filter * input_Hz)' * (c - S_filter * input_Hz), -0.5) * (c - S_filter * input_Hz)' * S_filter);
-
-
-% compute_objective = @(input_Hz) (-(c'*input_Hz)*conj(c'*input_Hz)) / ((input_Hz'*input_Hz) * (c' * c));
-
-% g_x_partial = @(input_Hz, S_filter) g_x_partial_normalized_overlap(c, input_Hz, S_filter);
-
-
-
 % Partial derivative of the objective function, g, with respect to the
 % field variable input_Hz
 g_x_partial = @(input_Hz, S_filter) -c'*S_filter*conj(c'*(S_filter*input_Hz));
@@ -75,70 +62,23 @@ g_x_partial = @(input_Hz, S_filter) -c'*S_filter*conj(c'*(S_filter*input_Hz));
 % for the convergence test will want to do a running average to make sure convergence is stable
 % or check something like not letting the objective value change too much
 % between iterations as a way to check for convergence
-step_size = 0.005;
+step_size = 20;
 num_iter = 40;
 
-% check fd grad
-h = 1e-8;
-r = 7;
-c = 12;
-% z = 1 ./ eps;
-eps(r, c) = eps(r, c) + h;
-[~, ~, Hz_up] = ob1_fdfd(spec.omega, eps, spec.in, spec.bc);
-ob_up = compute_objective(Hz_up(end,:).');
-eps(r, c) = eps(r, c) - 2*h;
-[~, ~, Hz_down] = ob1_fdfd(spec.omega, eps, spec.in, spec.bc);
-ob_down = compute_objective(Hz_down(end,:).');
-eps(r, c) = eps(r, c) + h;
-fd_grad = (ob_up - ob_down) / (2*h);
-
-[~, ~, ~, gradient_adj] = ob1_fdfd_adj(spec.omega, eps, spec.in, g_x_partial, spec.bc);
-% gradient_adj_z = -(eps .* eps) .* gradient_adj;
-adj_grad = gradient_adj(r, c);
-
-fprintf('GRAD COMPARISON: %f vs. %f!\n', fd_grad, adj_grad);
-
-%%
-    
-objective_over_time = zeros(num_iter, 1);
-
-start_idx = 4;
-
-z = 1 ./ eps;
-max_z = 1 ./ min_eps_array;
-min_z = 1 ./ max_eps_array;
-
 for n = 1 : 1 : num_iter
-    eps = 1 ./ z;
     tic;
     [Ex_adj, Ey_adj, Hz_adj, gradient_adj] = ob1_fdfd_adj(spec.omega, eps, spec.in, g_x_partial, spec.bc);
     adjoint_time = toc;
     
-    gradient_adj_z = -(eps .* eps) .* gradient_adj;
-
     current_objective = compute_objective(Hz_adj(end,:).');
-    fprintf('Iteration #%d, Objective Function Value = %f, Computation Time (sec) = %f (%f)!\n', ...
-        n, current_objective, adjoint_time, mean(mean(eps)));
-    fprintf('%f versus %f\n\n', norm(gradient_adj), norm(gradient_adj_z));
-    
-    objective_over_time(n) = current_objective;
-       
-    z(start_idx:end-2,start_idx:end-2) = z(start_idx:end-2,start_idx:end-2) - step_size * (gradient_adj_z(start_idx:end-2,start_idx:end-2));
-    z(start_idx:end-2,start_idx:end-2) = min(z(start_idx:end-2,start_idx:end-2), max_z(start_idx:end-2,start_idx:end-2));
-    z(start_idx:end-2,start_idx:end-2) = max(z(start_idx:end-2,start_idx:end-2), min_z(start_idx:end-2,start_idx:end-2));
-    
-%     eps(start_idx:end-2,start_idx:end-2) = eps(start_idx:end-2,start_idx:end-2) - step_size * (gradient_adj(start_idx:end-2,start_idx:end-2));
-%     eps(start_idx:end-2,start_idx:end-2) = min(eps(start_idx:end-2,start_idx:end-2), max_eps_array(start_idx:end-2,start_idx:end-2));
-%     eps(start_idx:end-2,start_idx:end-2) = max(eps(start_idx:end-2,start_idx:end-2), min_eps_array(start_idx:end-2,start_idx:end-2));
+    fprintf('Iteration #%d, Objective Function Value = %f, Computation Time (sec) = %f!\n', ...
+        n, current_objective, adjoint_time);
+           
+    eps = update_eps(eps, eps - step_size * gradient_adj, min_eps_array, max_eps_array);
 end
 
-eps = 1 ./ z;
 % Simulate the result and analyze the success of the design process.
 simulate(spec, eps, [simulation_width simulation_height]);
 
-% figure;
-% plot(1:num_iter, objective_over_time);
-
-% save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
-% csvwrite(save_epsilon_filename, eps);
-
+save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
+csvwrite(save_epsilon_filename, eps);

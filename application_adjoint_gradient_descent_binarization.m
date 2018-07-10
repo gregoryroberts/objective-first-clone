@@ -82,10 +82,7 @@ for n = 1 : 1 : num_iter
     fprintf('Iteration #%d, Sigmoid Strength = %f, Objective Function Value = %f, Computation Time (sec) = %f!\n', ...
         n, strength, cur_objective, adjoint_time);
     
-    eps(3:end-2,3:end-2) = eps(3:end-2,3:end-2) - step_size * (gradient_adj(3:end-2,3:end-2));
-    eps(3:end-2,3:end-2) = min(eps(3:end-2,3:end-2), max_eps_array(3:end-2,3:end-2));
-    eps(3:end-2,3:end-2) = max(eps(3:end-2,3:end-2), min_eps_array(3:end-2,3:end-2));
-    
+    eps = update_eps(eps, eps - step_size * gradient_adj, min_eps_array, max_eps_array);
 end
 
 z = reshape(apply_beta_sigmoid(eps(:), strength, eps_midpt), size(eps));
