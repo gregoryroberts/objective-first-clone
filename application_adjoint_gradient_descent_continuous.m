@@ -82,19 +82,19 @@ num_iter = 40;
 h = 1e-8;
 r = 7;
 c = 12;
-z = 1 ./ eps;
-z(r, c) = z(r, c) + h;
-[~, ~, Hz_up] = ob1_fdfd(spec.omega, 1 ./ z, spec.in, spec.bc);
+% z = 1 ./ eps;
+eps(r, c) = eps(r, c) + h;
+[~, ~, Hz_up] = ob1_fdfd(spec.omega, eps, spec.in, spec.bc);
 ob_up = compute_objective(Hz_up(end,:).');
-z(r, c) = z(r, c) - 2*h;
-[~, ~, Hz_down] = ob1_fdfd(spec.omega, 1 ./ z, spec.in, spec.bc);
+eps(r, c) = eps(r, c) - 2*h;
+[~, ~, Hz_down] = ob1_fdfd(spec.omega, eps, spec.in, spec.bc);
 ob_down = compute_objective(Hz_down(end,:).');
-z(r, c) = z(r, c) + h;
+eps(r, c) = eps(r, c) + h;
 fd_grad = (ob_up - ob_down) / (2*h);
 
 [~, ~, ~, gradient_adj] = ob1_fdfd_adj(spec.omega, eps, spec.in, g_x_partial, spec.bc);
-gradient_adj_z = -(eps .* eps) .* gradient_adj;
-adj_grad = gradient_adj_z(r, c);
+% gradient_adj_z = -(eps .* eps) .* gradient_adj;
+adj_grad = gradient_adj(r, c);
 
 fprintf('GRAD COMPARISON: %f vs. %f!\n', fd_grad, adj_grad);
 
