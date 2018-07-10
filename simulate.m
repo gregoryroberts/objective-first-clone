@@ -76,6 +76,8 @@ fprintf('P_in: %1.3e \nP_out: %1.3e \neff: %1.3f%%\n', ...
     P_in, P_out, 100 * eff);
 
 ob1_plot(dims, {'\epsilon', eps}, {'|Hz|', abs(Hz)}, {'Re(Hz)', real(Hz)});
+
+
 % ob1_plot(size(Hz), {'|Hz|', abs(Hz)}, {'Re(Hz)', real(Hz)});
 
 % The following commands may be used (uncommented) in order to plot more
