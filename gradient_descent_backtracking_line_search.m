@@ -7,6 +7,8 @@ function [new_eps, number_calls_obj, number_calls_adj] = ...
     t = 100.0;
     min_step_size = 2.0;
         
+    [row_dims, col_dims] = eps_dims_to_change(eps);
+
     [gradient_adj, number_calls_adj] = compute_gradient(eps);
     delta_x_full = -gradient_adj;
 
@@ -14,13 +16,13 @@ function [new_eps, number_calls_obj, number_calls_adj] = ...
     shift_eps = update_eps(eps, eps + t * delta_x_full, min_eps, max_eps);
     [objective, number_calls_obj] = compute_objective(shift_eps);
     
-    select_vector_gradient = gradient_adj(4:end-2, 4:end-2);
+    select_vector_gradient = gradient_adj(row_dims, col_dims);
     vector_gradient = select_vector_gradient(:);
 
     delta_x_matrix = ...
         -(min(t * gradient_adj, max_eps - eps) .* (gradient_adj > 0) + ...
         max(t * gradient_adj, min_eps - eps) .* (gradient_adj <= 0));
-    delta_x_matrix = delta_x_matrix(4:end-2, 4:end-2);
+    delta_x_matrix = delta_x_matrix(row_dims, col_dims);
     delta_x = delta_x_matrix(:);
     
 %     h = 1e-8;
@@ -44,7 +46,7 @@ function [new_eps, number_calls_obj, number_calls_adj] = ...
         delta_x_matrix = ...
             -(min(t * gradient_adj, max_eps - eps) .* (gradient_adj > 0) + ...
             max(t * gradient_adj, min_eps - eps) .* (gradient_adj <= 0));
-        delta_x_matrix = delta_x_matrix(4:end-2, 4:end-2);
+        delta_x_matrix = delta_x_matrix(row_dims, col_dims);
         delta_x = delta_x_matrix(:);
 
         fprintf('%e versus %e (step_size = %e)\n', objective - initial_objective, alpha*t*vector_gradient'*delta_x, t)
