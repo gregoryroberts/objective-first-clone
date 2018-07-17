@@ -18,7 +18,7 @@ min_eps_array = 1.0 * ones(size(eps0));
 
 % The input mode coupling from and the output mode coupling to
 input_mode = 1;
-output_mode = 2;
+output_mode = 3;
 design_frequency = 0.15;
 
 % Run the rectangular waveguide completely through the middle of the

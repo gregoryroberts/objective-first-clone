@@ -18,7 +18,7 @@ min_eps_array = 1.0 * ones(size(eps0));
 
 % The input mode coupling from and the output mode coupling to
 input_mode = 1;
-output_mode = 3;
+output_mode = 2;
 design_frequency = 0.15;
 
 % Run the rectangular waveguide completely through the middle of the
@@ -95,6 +95,13 @@ gradient_norm = zeros(num_iter, 1);
 avg_abs_grad = zeros(num_iter, 1);
 obj_fn = zeros(num_iter, 1);
 
+num_parameters = prod(size(eps(change_rows, change_cols)));
+
+direction = zeros(num_parameters, num_iter);
+reduced_gradient = zeros(num_parameters, num_iter);
+
+type = 'pr';
+
 for n = 1 : 1 : num_iter
     tic;
     eps = get_eps_from_z(z);
@@ -108,11 +115,33 @@ for n = 1 : 1 : num_iter
     current_objective = compute_objective(Hz_adj(end,:).', Ey_adj(end,:).');
     num_objective_fn_calls = num_objective_fn_calls + 1;
     
-    get_max_gradient_value = max(abs(gradient_adj_z(:)));
+    reduced_gradient_z = gradient_adj_z(change_rows, change_cols);
+    reduced_gradient(:, n) = reduced_gradient_z(:);
     
-    step_size = step_size_max_unnormalized / get_max_gradient_value;
-    step_size_min = step_size_min_unnormalized / get_max_gradient_value;
-    cur_z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
+    last_idx = max(1, n - 1);
+    
+    if (strcmp(type, 'pr'))
+    
+        beta = ((reduced_gradient(:, n) - reduced_gradient(:, last_idx))' * reduced_gradient(:, n)) / ...
+            (reduced_gradient(:, last_idx)' * reduced_gradient(:, last_idx));
+        
+    else
+        
+        beta = (reduced_gradient(:, n)' * reduced_gradient(:, n)) / ...
+            (reduced_gradient(:, last_idx)' * reduced_gradient(:, last_idx));
+
+    end
+    
+    direction(:, n) = -reduced_gradient(:, n) + beta * direction(:, last_idx);
+
+    cur_direction = reshape(direction(:, n), [length(change_rows), length(change_cols)]);
+    cur_direction_full = zeros(size(z));
+    cur_direction_full(change_rows, change_cols) = cur_direction;
+    get_max_direction_value = max(abs(cur_direction(:)));
+    
+    step_size = step_size_max_unnormalized / get_max_direction_value;
+    step_size_min = step_size_min_unnormalized / get_max_direction_value;
+    cur_z = update_z(z, z + step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
     cur_eps = get_eps_from_z(cur_z);
     
     [~, Ey_check, Hz_check] = ob1_fdfd(spec.omega, cur_eps, spec.in, spec.bc);
@@ -121,14 +150,14 @@ for n = 1 : 1 : num_iter
     while ((check_objective >= current_objective) && (0.5 * step_size > step_size_min))
         num_objective_fn_calls = num_objective_fn_calls + 1;
         step_size = 0.5 * step_size;
-        cur_z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
+        cur_z = update_z(z, z + step_size * cur_direction_full, min_z_array_scaled, max_z_array_scaled);
         cur_eps = get_eps_from_z(cur_z);
         
         [~, Ey_check, Hz_check] = ob1_fdfd(spec.omega, cur_eps, spec.in, spec.bc);
         check_objective = compute_objective(Hz_check(end,:).', Ey_check(end,:).');
     end
        
-    z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
+    z = update_z(z, z + step_size * cur_direction_full, min_z_array_scaled, max_z_array_scaled);
     fprintf('Iteration #%d, Next Step Size = %f, Objective Function Value = %f, Computation Time (sec) = %f!\n', ...
         n, step_size, check_objective, adjoint_time);
     
@@ -143,13 +172,13 @@ eps = get_eps_from_z(z);
 simulate(spec, eps, [simulation_width simulation_height]);
 
 save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
-csvwrite(save_epsilon_filename, eps);
+csvwrite(save_epsilon_filename, eps);g
 
-save_obj_fn_filename = sprintf('obj_fn_backtrack_%d_%d.csv', input_mode, output_mode);
-save_grad_norm_filename = sprintf('grad_norm_backtrack_%d_%d.csv', input_mode, output_mode);
-save_avg_abs_grad_filename = sprintf('obj_fn_avg_abs_grad_backtrack_%d_%d.csv', input_mode, output_mode);
-save_num_obj_calls_filename = sprintf('num_obj_calls_backtrack_%d_%d.csv', input_mode, output_mode);
-save_num_grad_calls_filename = sprintf('num_grad_calls_backtrack_%d_%d.csv', input_mode, output_mode);
+save_obj_fn_filename = sprintf('obj_fn_conj_grad_%s_%d_%d.csv', type, input_mode, output_mode);
+save_grad_norm_filename = sprintf('grad_norm_conj_grad_%s_%d_%d.csv', type, input_mode, output_mode);
+save_avg_abs_grad_filename = sprintf('obj_fn_avg_abs_grad_conj_grad_%s_%d_%d.csv', type, input_mode, output_mode);
+save_num_obj_calls_filename = sprintf('num_obj_calls_conj_grad_%s_%d_%d.csv', type, input_mode, output_mode);
+save_num_grad_calls_filename = sprintf('num_grad_calls_conj_grad_%s_%d_%d.csv', type, input_mode, output_mode);
 
 csvwrite(save_obj_fn_filename, obj_fn);
 csvwrite(save_grad_norm_filename, gradient_norm);

@@ -18,7 +18,7 @@ min_eps_array = 1.0 * ones(size(eps0));
 
 % The input mode coupling from and the output mode coupling to
 input_mode = 1;
-output_mode = 3;
+output_mode = 2;
 design_frequency = 0.15;
 
 % Run the rectangular waveguide completely through the middle of the
@@ -77,8 +77,7 @@ deps_dz = @(z) (-1.0 ./ power(((z * z_scale) + z_offset), 2)) * z_scale;
 % for the convergence test will want to do a running average to make sure convergence is stable
 % or check something like not letting the objective value change too much
 % between iterations as a way to check for convergence
-step_size_max_unnormalized = 0.05;
-step_size_min_unnormalized = 5e-5;
+step_size_max_unnormalized = 0.025;
 num_iter = 50;
 
 % Should we also be moving a variable scaled to be between 0 and 1 (min/max
@@ -108,27 +107,14 @@ for n = 1 : 1 : num_iter
     current_objective = compute_objective(Hz_adj(end,:).', Ey_adj(end,:).');
     num_objective_fn_calls = num_objective_fn_calls + 1;
     
-    get_max_gradient_value = max(abs(gradient_adj_z(:)));
-    
+    get_max_gradient_value = max(abs(gradient_adj_z(:))); 
     step_size = step_size_max_unnormalized / get_max_gradient_value;
-    step_size_min = step_size_min_unnormalized / get_max_gradient_value;
-    cur_z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
-    cur_eps = get_eps_from_z(cur_z);
-    
-    [~, Ey_check, Hz_check] = ob1_fdfd(spec.omega, cur_eps, spec.in, spec.bc);
-    check_objective = compute_objective(Hz_check(end,:).', Ey_check(end,:).');
-
-    while ((check_objective >= current_objective) && (0.5 * step_size > step_size_min))
-        num_objective_fn_calls = num_objective_fn_calls + 1;
-        step_size = 0.5 * step_size;
-        cur_z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
-        cur_eps = get_eps_from_z(cur_z);
-        
-        [~, Ey_check, Hz_check] = ob1_fdfd(spec.omega, cur_eps, spec.in, spec.bc);
-        check_objective = compute_objective(Hz_check(end,:).', Ey_check(end,:).');
-    end
        
     z = update_z(z, z - step_size * gradient_adj_z, min_z_array_scaled, max_z_array_scaled);
+    check_eps = get_eps_from_z(z);
+    [~, Ey_check, Hz_check] = ob1_fdfd(spec.omega, check_eps, spec.in, spec.bc);
+    check_objective = compute_objective(Hz_check(end,:).', Ey_check(end,:).');
+
     fprintf('Iteration #%d, Next Step Size = %f, Objective Function Value = %f, Computation Time (sec) = %f!\n', ...
         n, step_size, check_objective, adjoint_time);
     
@@ -145,11 +131,11 @@ simulate(spec, eps, [simulation_width simulation_height]);
 save_epsilon_filename = sprintf('adjoint_eps_%d_%d.csv', input_mode, output_mode);
 csvwrite(save_epsilon_filename, eps);
 
-save_obj_fn_filename = sprintf('obj_fn_backtrack_%d_%d.csv', input_mode, output_mode);
-save_grad_norm_filename = sprintf('grad_norm_backtrack_%d_%d.csv', input_mode, output_mode);
-save_avg_abs_grad_filename = sprintf('obj_fn_avg_abs_grad_backtrack_%d_%d.csv', input_mode, output_mode);
-save_num_obj_calls_filename = sprintf('num_obj_calls_backtrack_%d_%d.csv', input_mode, output_mode);
-save_num_grad_calls_filename = sprintf('num_grad_calls_backtrack_%d_%d.csv', input_mode, output_mode);
+save_obj_fn_filename = sprintf('obj_fn_fixed_%d_%d.csv', input_mode, output_mode);
+save_grad_norm_filename = sprintf('grad_norm_fixed_%d_%d.csv', input_mode, output_mode);
+save_avg_abs_grad_filename = sprintf('obj_fn_avg_abs_grad_fixed_%d_%d.csv', input_mode, output_mode);
+save_num_obj_calls_filename = sprintf('num_obj_calls_fixed_%d_%d.csv', input_mode, output_mode);
+save_num_grad_calls_filename = sprintf('num_grad_calls_fixed_%d_%d.csv', input_mode, output_mode);
 
 csvwrite(save_obj_fn_filename, obj_fn);
 csvwrite(save_grad_norm_filename, gradient_norm);
