@@ -122,7 +122,14 @@ complex_gradient = zeros(prod(dims), 1);
 % Perform this multiplication once first instead of in every loop
 Hcurl_Hz = Hcurl * Hz;
 
-adj_src = g_x_partial(Hz, S_filter).';
+persistent Ey_select;
+if isempty(Ey_select)
+    Ey_select = [diag(zeros(1, pdims)), eye(pdims, pdims)];
+end
+
+Ey_hat = Ey_select * ((1i/omega) * inv_eps * Hcurl);
+
+adj_src = g_x_partial(Hz, Ey_hat, S_filter).';
 % Vectorize to fit in form of the forward problem
 adj_src = adj_src(:);
 lambda = A' \ conj(adj_src);
